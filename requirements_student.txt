@@ -1,0 +1,6 @@
+PyAudio
+keyboard
+pyserial
+scipy
+numpy
+matplotlib
