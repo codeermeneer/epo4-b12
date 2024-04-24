@@ -1,23 +1,31 @@
+import serial
+import keyboard
+
 class KITT:
-    def __init__(self, model, color):
-        self.model = model
-        self.color = color
-        self.is_engine_on = False
+    def __init__(self, port, baudrate=115200):
+        self.serial = serial.Serial(port, baudrate, rtscts=True)
+        # state variables such as speed, angle are defined here
 
-    def start_engine(self):
-        self.is_engine_on = True
-        print(f"{self.model}'s engine started.")
+    def send_command(self, command):
+        self.serial.write(command.encode())
 
-    def stop_engine(self):
-        self.is_engine_on = False
-        print(f"{self.model}'s engine stopped.")
+    def set_speed(self, speed):
+        self.send_command(f'M{speed}\n')
+
+    def set_angle(self, angle):
+        self.send_command(f'D{angle}\n')
+
+    def stop(self):
+        self.set_speed(150)
+        self.set_angle(150)
+
+    def __del__(self)
+        self.serial.close()
+
+def wasd(kitt):
+    # add your code
 
 if __name__ == "__main__":
-    car1 = KITT("TRX4", "black")    # Make the first instance of KITT
-    car2 = KITT("Rustler", "red")   # Make the second instance of KITT
-
-    car2.color = "blue"             # Change the color of
-    car1.start_engine()             # Start the engine of car1
-    print(car1.is_engine_on)        # Output: "True"
-    print(car1.model)               # Output: "TRX4"
-    print(car1.color)               # Output: "black"
+    # test code follows here
+    kitt = KITT("/dev/rfcomm0")
+    wasd(kitt)
