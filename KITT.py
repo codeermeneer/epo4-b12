@@ -14,10 +14,15 @@ class KITT:
         # initialize audio beacon
         self.start_beacon()             # turn on beacon
 
-        self.send_command(f'F{carrier_frequency}\n')
-        self.send_command(f'B{bit_frequency}\n')
-        self.send_command(f'R{repitition_count}\n')
-        self.send_command(f'C{code}\n')
+        carrier_frequency = carrier_frequency.to_bytes(2, byteorder='big')
+        bit_frequency = bit_frequency.to_bytes(2, byteorder='big')
+        repitition_count = repitition_count.to_bytes(2, byteorder='big')
+        code = code.to_bytes(4, byteorder='big')
+
+        self.serial.write(b'F' + carrier_frequency + b'\n')
+        self.serial.write(b'B' + bit_frequency + b'\n')
+        self.serial.write(b'R' + repitition_count + b'\n')
+        self.serial.write(b'C' + code + b'\n')
 
         # state variables such as speed, angle are defined here
 
