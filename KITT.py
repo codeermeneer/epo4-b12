@@ -4,15 +4,24 @@ import time
 import re
 import numpy as np
 import csv
+import pyaudio
+from scipy.io import wavfile
 
 class KITT:
     def __init__(
-        self, port, baudrate=115200,
+        self, device_index, port, baudrate=115200,
         carrier_frequency=10000,
         bit_frequency=5000,
         repitition_count=2500,
         code=0xDEADBEEF
     ):
+        self.Fs = 44100
+        self.stream = pyaudio_handle.open(input_device_index=device_index,
+                                     channels=5,
+                                     format=pyaudio.paInt16,
+                                     rate=self.Fs,
+                                     input=True)
+
         self.serial = serial.Serial(port, baudrate, rtscts=True)
 
         # initialize audio beacon
@@ -84,6 +93,19 @@ class KITT:
             mywriter = csv.writer(file, delimiter=",")
             mywriter.writerows(self.sensor_data)
 
+    def record(self, N):
+        self.start_beacon()
+        samples = self.stream.read(N)
+        self.stop_beacon()
+        data = np.frombuffer(samples, dtype='int16')
+        data = np.reshape(data, (N, 5))
+        data = np.transpose(data)
+        wavfile.write("ch1.wav", self.Fs, data[0])
+        wavfile.write("ch2.wav", self.Fs, data[1])
+        wavfile.write("ch3.wav", self.Fs, data[2])
+        wavfile.write("ch4.wav", self.Fs, data[3])
+        wavfile.write("ch5.wav", self.Fs, data[4])
+
     def __del__(self):
         self.stop()                     # stop car
         self.send_command(f'A0\n')      # turn off beacon
@@ -130,6 +152,10 @@ def wasd(kitt):
             print("saving sensor data..")
             kitt.save_sensor_data()
 
+        if event.event_type == keyboard.KEY_DOWN and event.name == 'z':
+            print("recording...")
+            kitt.record(88200)
+
         # exit loop when escape is pressed
         if event.event_type == keyboard.KEY_DOWN and event.name == 'esc':
             print("exiting...")
@@ -140,5 +166,15 @@ if __name__ == "__main__":
     # test code follows here
     #comport = input("Please enter your comport: ")
     comport = "/dev/rfcomm0"
-    kitt = KITT(comport)
+
+    pyaudio_handle = pyaudio.PyAudio()
+
+    for i in range(pyaudio_handle.get_device_count()):
+        device_info = pyaudio_handle.get_device_info_by_index(i)
+        print(i, device_info['name'])
+
+    device_index = int(input("Please choose an audio device: "))
+    device_info = pyaudio_handle.get_device_info_by_index(device_index)
+    print(device_info)
+    kitt = KITT(device_index, comport)
     wasd(kitt)
