@@ -39,7 +39,7 @@ class KITT:
         self.serial.write(b'C' + code + b'\n')
 
         #self.delays = []
-        self.sensor_data = [['time', 'dist_l', 'dist_r']]
+        self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay']]
         self.start_time = time.time()
 
 
@@ -102,12 +102,12 @@ class KITT:
         end = time.time()
         duration = end - start
         print(f"{duration} seconds")
-        #self.delays.append(duration)
 
-        self.sensor_data.append([t_plus, dist_l, dist_r])
+        self.sensor_data.append([t_plus, dist_l, dist_r, duration])
 
-    def save_sensor_data(self):
-        with open("sensors.csv", "w", newline="") as file:
+    def save_log_data(self):
+        timestamp = datetime.datetime.now().replace(microsecond=0).isoformat()
+        with open("log_%s.csv" % timestamp, "w", newline="") as file:
             mywriter = csv.writer(file, delimiter=",")
             mywriter.writerows(self.sensor_data)
 
@@ -133,8 +133,17 @@ class KITT:
         #print(delays)
 
 def wasd(kitt):
+    logging = true
+    logging_interval = 0.5
+    current_time = time.time()
+    old_time = 0
     while True:
         event = keyboard.read_event()
+
+        current_time = time.time()
+        if logging and current_time - old_time > logging_interval:
+            kitt.read_sensors()
+        old_time = current_time
 
         if event.event_type == keyboard.KEY_DOWN and event.name == 'w':
             #print("going forward")
@@ -168,10 +177,11 @@ def wasd(kitt):
             print("stopping beacon")
             kitt.stop_beacon()
 
-        if event.event_type == keyboard.KEY_DOWN and event.name == 'r':
-            kitt.read_sensors()
-        if event.event_type == keyboard.KEY_DOWN and event.name == 't':
-            print("saving sensor data..")
+        if event.event_type == keyboard.KEY_DOWN and event.name == 'l':
+            #kitt.read_sensors()
+            logging != logging
+        if event.event_type == keyboard.KEY_DOWN and event.name == 'p':
+            print("saving logs..")
             kitt.save_sensor_data()
 
         if event.event_type == keyboard.KEY_DOWN and event.name == 'z':
