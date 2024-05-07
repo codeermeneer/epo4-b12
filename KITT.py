@@ -44,18 +44,36 @@ class KITT:
 
 
         # state variables such as speed, angle are defined here
+        self.last_dir = "stopped"
 
 
     def send_command(self, command):
         self.serial.write(command.encode())
 
     def set_speed(self, speed):
+        if speed > 150:
+            self.last_dir = "forward"
+        elif speed < 150:
+            self.last_dir = "backward"
+
         self.send_command(f'M{speed}\n')
 
     def set_angle(self, angle):
         self.send_command(f'D{angle}\n')
 
     def stop(self):
+        self.set_speed(150)
+        self.set_angle(150)
+
+    def ebrake(self):
+        #if self.status != "stopped":
+        if self.status == "forward":
+            print("going back")
+            self.set_speed(135)
+        elif self.status == "backward":
+            print("going forward")
+            self.set_speed(165)
+
         self.set_speed(150)
         self.set_angle(150)
 
@@ -138,6 +156,10 @@ def wasd(kitt):
         if event.event_type == keyboard.KEY_UP and (event.name == 'a' or event.name == 'd'):
             #print("resetting wheel angle")
             kitt.set_angle(150)
+
+        if event.event_type == keyboard.KEY_DOWN and event.name == 'space':
+            print("braking")
+            kitt.ebrake()
 
         if event.event_type == keyboard.KEY_DOWN and event.name == 'e':
             print("starting beacon")
