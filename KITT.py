@@ -6,6 +6,7 @@ import numpy as np
 import csv
 import pyaudio
 from scipy.io import wavfile
+import datetime
 
 class KITT:
     def __init__(
@@ -17,7 +18,7 @@ class KITT:
     ):
         self.Fs = 44100
         self.stream = pyaudio_handle.open(input_device_index=device_index,
-                                     channels=5,
+                                     channels=1,
                                      format=pyaudio.paInt16,
                                      rate=self.Fs,
                                      input=True)
@@ -39,7 +40,7 @@ class KITT:
         self.serial.write(b'C' + code + b'\n')
 
         #self.delays = []
-        self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay']]
+        self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay', 'voltage']]
         self.start_time = time.time()
 
 
@@ -96,20 +97,33 @@ class KITT:
         res = list(map(int, temp))
         dist_l = res[0]
         dist_r = res[1]
-        print(dist_l)
-        print(dist_r)
+        #print(dist_l)
+        #print(dist_r)
+
+        self.send_command(f'Sv\n')
+        status = self.serial.read_until(b'\x04')
+        print(status)
+        temp = status.decode()
+        temp = re.findall(r'\d+\.\d+', temp)
+        res = list(map(float, temp))
+        voltage = res[0]
 
         end = time.time()
         duration = end - start
         print(f"{duration} seconds")
 
-        self.sensor_data.append([t_plus, dist_l, dist_r, duration])
+        self.sensor_data.append([t_plus, dist_l, dist_r, duration, voltage])
 
     def save_log_data(self):
         timestamp = datetime.datetime.now().replace(microsecond=0).isoformat()
-        with open("log_%s.csv" % timestamp, "w", newline="") as file:
+        with open("logs/log_%s.csv" % timestamp, "w", newline="") as file:
             mywriter = csv.writer(file, delimiter=",")
             mywriter.writerows(self.sensor_data)
+
+    def clear_data(self):
+        print("clearing data...")
+        self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay', 'voltage']]
+        self.start_time = time.time()
 
     def record(self, N):
         self.start_beacon()
@@ -133,24 +147,55 @@ class KITT:
         #print(delays)
 
 def wasd(kitt):
-    logging = true
+    logging = True
     logging_interval = 0.5
     current_time = time.time()
     old_time = 0
+    speed = 0
+
     while True:
         event = keyboard.read_event()
 
         current_time = time.time()
         if logging and current_time - old_time > logging_interval:
             kitt.read_sensors()
-        old_time = current_time
+            old_time = current_time
+
+        if event.event_type == keyboard.KEY_DOWN and event.name == '1':
+            #speed = 4
+            if speed > 0:
+                speed -= 1
+            print("set speed to ", speed)
+        if event.event_type == keyboard.KEY_DOWN and event.name == '2':
+            #speed = 6
+            if speed < 15:
+                speed += 1
+            print("set speed to ", speed)
+        if event.event_type == keyboard.KEY_DOWN and event.name == '3':
+            speed = 9
+            print("set speed to ", speed)
+        if event.event_type == keyboard.KEY_DOWN and event.name == '4':
+            speed = 12
+            print("set speed to ", speed)
+        if event.event_type == keyboard.KEY_DOWN and event.name == '5':
+            speed = 15
+            print("set speed to ", speed)
+
+#        if event.event_type == keyboard.KEY_DOWN and event.name == 'minus':
+#            if speed > 0:
+#                speed -= 1
+#            print("set speed to ", speed)
+#        if event.event_type == keyboard.KEY_DOWN and event.name == '=':
+#            if speed < 15:
+#                speed += 1
+#            print("set speed to ", speed)
 
         if event.event_type == keyboard.KEY_DOWN and event.name == 'w':
             #print("going forward")
-            kitt.set_speed(165)
+            kitt.set_speed(150 + speed)
         if event.event_type == keyboard.KEY_DOWN and event.name == 's':
             #print("going backwards")
-            kitt.set_speed(135)
+            kitt.set_speed(150 - speed)
         if event.event_type == keyboard.KEY_DOWN and event.name == 'a':
             #print("going left")
             kitt.set_angle(200)
@@ -182,7 +227,9 @@ def wasd(kitt):
             logging != logging
         if event.event_type == keyboard.KEY_DOWN and event.name == 'p':
             print("saving logs..")
-            kitt.save_sensor_data()
+            kitt.save_log_data()
+        if event.event_type == keyboard.KEY_DOWN and event.name == 'o':
+            kitt.clear_data()
 
         if event.event_type == keyboard.KEY_DOWN and event.name == 'z':
             print("recording...")
