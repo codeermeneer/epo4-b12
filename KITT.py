@@ -18,7 +18,7 @@ class KITT:
     ):
         self.Fs = 44100
         self.stream = pyaudio_handle.open(input_device_index=device_index,
-                                     channels=1,
+                                     channels=5,
                                      format=pyaudio.paInt16,
                                      rate=self.Fs,
                                      input=True)
