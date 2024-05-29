@@ -157,14 +157,10 @@ class KITT:
         # deinterleave channels
         data = np.frombuffer(samples, dtype='int16')
         data = np.reshape(data, (N, 5))
-        data = np.transpose(data)
+        #data = np.transpose(data)
 
         # save to file
-        wavfile.write("ch1.wav", self.Fs, data[0])
-        wavfile.write("ch2.wav", self.Fs, data[1])
-        wavfile.write("ch3.wav", self.Fs, data[2])
-        wavfile.write("ch4.wav", self.Fs, data[3])
-        wavfile.write("ch5.wav", self.Fs, data[4])
+        wavfile.write("recording.wav", self.Fs, data)
 
     # deconstructor, stops the car and beacon and then safely closes the serial connection
     def __del__(self):
