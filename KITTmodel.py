@@ -4,101 +4,76 @@ import matplotlib.pyplot as plt
 from scipy import integrate
 import pandas as pd
 
-m = 5.6
-b = 5
-c = 0.1
-Fa = 9.2
-Fb = 0
-Fd = 0
+class KITTmodel:
+    # class constructor
+    # m     vehicle mass
+    # b     drag coefficient
+    # c     air drag coefficient
+    # L     distance between the axles of the car
+    # x0    initial x position
+    # y0    initial y position
+    # alpha0    initial orientation of the vehicle
+    # v0    initial velocity of the car
+    def __init__(self, m, b, c, L, x0, y0, alpha0, v0):
+        self.mass = m
+        self.b = b
+        self.c = c
+        self.length = L
+        self.x = np.array([x0,y0])
+        self.alpha = np.radians(alpha0)
+        self.v = v0
+        self.z = 0
 
-a = 0
-v = 0
-z = 0
-t = 0
-dt = 0.01
+    # simulate the model for dt seconds
+    # phi       steering angle
+    # Fa        motor force
+    # Fb        breaking force
+    # dt        time step
+    def sim(self, phi, Fa, Fb, dt):
+        Fd = self.b * abs(self.v) + self.c * self.v**2
+        Ftot = Fa - (Fd + Fb)
+        a = Ftot / self.mass
 
-v_list = []
-z_list = []
-t_list = []
+        self.v += a * dt
 
-def vel(t, v0):
-    return (Fa-Fb)/b + ((Fb-Fa)/b)*np.exp((-b*t)/m)
+        phi = np.radians(phi)
+        d = np.array([np.cos(self.alpha),np.sin(self.alpha)])
+        d_orth = np.array([-np.sin(self.alpha),np.cos(self.alpha)])
 
-while t < 8:
-    Fd = b * abs(v) + c * v**2
-    Ftot = Fa - (Fd + Fb)
-    a = Ftot / m
-    v += a * dt
-    z += v * dt
-    v_list.append(v)
-    z_list.append(z)
-    t_list.append(t)
-    t += dt
+        if phi != 0:  # if the wheels are turned use the turning model
+            R = self.length / np.sin(phi)
+            circle = self.x + R*d_orth
 
-t = np.linspace(0, 8, 1000)
-v = vel(t,0)
-z = integrate.cumtrapz(v,t, initial=0)
+            omega = (self.v * np.sin(phi))/self.length
+            theta = omega * dt
+            self.alpha = (self.alpha + theta) % (2*np.pi)
 
-fig,a = plt.subplots(2,2)
+            Rot = np.array([[np.cos(theta), -np.sin(theta)],
+                            [np.sin(theta), np.cos(theta)]])
 
-a[0][0].plot(t_list, z_list, color='red')
-a[0][0].plot(t, z, color='blue')
-a[0][0].set_xlabel("Time [s]")
-a[0][0].set_ylabel("Z Position [m]")
-a[0][0].set_title("Distance")
+            self.x = circle + np.matmul(Rot, self.x-circle)
+        else:       # if the wheels are straight go in a straight line
+            self.x = self.x + ((self.v*dt) * d)
 
-a[1][0].plot(t_list, v_list, color='red')
-a[1][0].plot(t, v, color='blue')
-a[1][0].set_xlabel("Time [s]")
-a[1][0].set_ylabel("Velocity [m/s]")
-a[1][0].set_title("Velocity")
+        Fd = self.b * abs(self.v) + self.c * self.v**2
+        Ftot = Fa - (Fd + Fb)
+        a = Ftot / self.mass
 
-a[0][1].plot(t_list, z_list, color='red')
-a[0][1].plot(t, z, color='blue')
-a[0][1].set_xlabel("Time [s]")
-a[0][1].set_ylabel("Z Position [m]")
-a[0][1].set_title("Distance")
+        self.v += a * dt
+        self.z += abs(self.v * dt)
 
-a[1][1].plot(t_list, v_list, color='red')
-a[1][1].plot(t, v, color='blue')
-a[1][1].set_xlabel("Time [s]")
-a[1][1].set_ylabel("Velocity [m/s]")
-a[1][1].set_title("Velocity")
+    def get_x(self):
+        return self.x
 
-data = pd.read_csv("logs/motor/165.csv")
-distances = ((data['dist_r'].values + data['dist_l']) / 2)/100
-distances = distances[0] - distances
-time = data['time'].values
-time = time - time[0]
+    def get_alpha(self):
+        return self.alpha
 
-a[0][0].scatter(time, distances, color='green')
+    def get_v(self):
+        return self.v
 
-velocity = []
-for i in range(1,len(distances)):
-    velocity.append((distances[i]-distances[i-1])/(time[i]-time[i-1]))
-vel_time = []
-for i in range(1,len(time)):
-    vel_time.append(time[i-1]+((time[i] - time[i-1])/2))
+    def get_z(self):
+        return self.z
 
-print(time)
-print(vel_time)
-
-a[1][0].scatter(vel_time, velocity, color='green')
-a[0][0].set_xlim(0, 8)
-a[1][0].set_xlim(0, 8)
-
-print(data)
-data = pd.read_csv("logs/motor/165.csv")
-distances = ((data['dist_r'].values + data['dist_l']) / 2)/100
-distances = distances[0] - distances
-time = data['time'].values
-time = time - time[0]
-velocity = [0]
-for i in range(1,len(distances)):
-    velocity.append((distances[i]-distances[i-1])/(time[i]-time[i-1]))
-
-
-a[0][1].scatter(time, distances, color='green')
-a[1][1].scatter(time, velocity, color='green')
-
-plt.show()
+    # solved simplified differential equation for v0 = 0
+    def vel(self, Fa, Fb, t, v0):
+        return (Fa-Fb)/self.b + ((Fb-Fa)/self.b)*np.exp((-self.b*t)/self.mass)
