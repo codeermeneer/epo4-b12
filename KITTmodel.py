@@ -26,6 +26,9 @@ class KITTmodel:
         self.Fb = 0
         self.phi = 0
 
+    def set_force(self, force):
+        self.Fa = force
+
     # sets the KITT motor to the given speed
     # speed        the speed to give to KITT
     def set_speed(self, speed):
@@ -34,7 +37,7 @@ class KITTmodel:
                     156: 2.4,
                     159: 4.8,
                     162: 7.5,
-                    165: 8.9  }
+                    165: 12.4  }
         self.Fa = forces[speed]
 
     # sets the KITT wheels to the given angle
@@ -58,7 +61,7 @@ class KITTmodel:
 
         if self.phi != 0:  # if the wheels are turned use the turning model
             R = self.length / np.sin(self.phi)
-            circle = self.x + R*d_orth
+            circle = (self.x-0.175*d) + R*d_orth
 
             omega = (self.v * np.sin(self.phi))/self.length
             theta = omega * dt
@@ -67,7 +70,7 @@ class KITTmodel:
             Rot = np.array([[np.cos(theta), -np.sin(theta)],
                             [np.sin(theta), np.cos(theta)]])
 
-            self.x = circle + np.matmul(Rot, self.x-circle)
+            self.x = (circle + np.matmul(Rot, (self.x-0.175*d)-circle) + 0.175*d)
         else:       # if the wheels are straight go in a straight line
             self.x = self.x + ((self.v*dt) * d)
 
