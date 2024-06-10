@@ -7,6 +7,7 @@ import csv
 import pyaudio
 from scipy.io import wavfile
 import datetime
+from threading import Thread
 
 class KITT:
     # class constructor
@@ -49,11 +50,16 @@ class KITT:
         self.serial.write(b'C' + code + b'\n')
 
         # initialize sensor data array
-        self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay', 'voltage']]
+        self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay', 'voltage', 'speed', 'angle']]
         self.start_time = time.time()
 
         # state variables such as speed, angle are defined here
+        self.speed = 150
+        self.angle = 150
+
         self.last_dir = "stopped"
+
+        self.logging = True
 
 
     # sends the given command via serial
@@ -69,11 +75,14 @@ class KITT:
         elif speed < 150:
             self.last_dir = "backward"
 
+        self.speed = speed
+
         self.send_command(f'M{speed}\n')
 
     # sets the KITT wheels to the given angle
     # angle        the angle to give to KITT
     def set_angle(self, angle):
+        self.angle = angle
         self.send_command(f'D{angle}\n')
 
     # stops the motors and straightens the wheels
@@ -84,6 +93,8 @@ class KITT:
     # not working yet!
     # emergence brake to quickly stop the vehicle
     def ebrake(self):
+        self.set_angle(150)
+
         #if self.status != "stopped":
         if self.status == "forward":
             print("going back")
@@ -93,7 +104,6 @@ class KITT:
             self.set_speed(165)
 
         self.set_speed(150)
-        self.set_angle(150)
 
     # starts the audio beacon
     def start_beacon(self):
@@ -122,7 +132,7 @@ class KITT:
         # read voltage
         self.send_command(f'Sv\n')
         status = self.serial.read_until(b'\x04')
-        print(status)
+        #print(status)
         temp = status.decode()
         temp = re.findall(r'\d+\.\d+', temp)
         res = list(map(float, temp))
@@ -132,7 +142,10 @@ class KITT:
         end = time.time()
         duration = end - start
 
-        self.sensor_data.append([t_plus, dist_l, dist_r, duration, voltage])
+        self.sensor_data.append([t_plus, dist_l, dist_r, duration, voltage, self.speed, self.angle])
+
+    def toggle_logs(self):
+        self.logging = not self.logging
 
     # saves the sensor data array to a csv file
     def save_log_data(self):
@@ -145,7 +158,7 @@ class KITT:
     # clears the sensor data array
     def clear_data(self):
         print("clearing data...")
-        self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay', 'voltage']]
+        self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay', 'voltage', 'speed', 'angle']]
         self.start_time = time.time()
 
     # records N samples of audio
@@ -168,25 +181,15 @@ class KITT:
         self.send_command(f'A0\n')      # turn off beacon
         self.serial.close()             # close serial connection
 
-        print(self.sensor_data)         # print final sensor data
+        #print(self.sensor_data)         # print final sensor data
 
 # function to control the car using keyboard controls
 def wasd(kitt):
-    logging = True
-    logging_interval = 0.5
-    current_time = time.time()
-    old_time = 0
     speed = 0
     angle = 0
 
     while True:
         event = keyboard.read_event()
-
-        # read the sensor data each logging interval
-        current_time = time.time()
-        if logging and current_time - old_time > logging_interval:
-            kitt.read_sensors()
-            old_time = current_time
 
         if event.event_type == keyboard.KEY_DOWN and event.name == '1':
             if speed > 0:
@@ -234,8 +237,8 @@ def wasd(kitt):
 
         # toggle logging
         if event.event_type == keyboard.KEY_DOWN and event.name == 'l':
-            logging = not logging
-            print("Logging:", logging)
+            kitt.toggle_logs()
+            print("Logging:", kitt.logging)
         if event.event_type == keyboard.KEY_DOWN and event.name == 'p':
             print("saving logs..")
             kitt.save_log_data()
@@ -283,6 +286,19 @@ if __name__ == "__main__":
     device_info = pyaudio_handle.get_device_info_by_index(device_index)
     print(device_info)
 
+    logging_interval = 0.1
+    current_time = time.time()
+    old_time = 0
+
     kitt = KITT(device_index, comport)
-    wasd(kitt)
+
+    wasd_thread = Thread(target=wasd, args=(kitt,))
+    wasd_thread.start()
+    while wasd_thread.is_alive():
+        # read the sensor data each logging interval
+        current_time = time.time()
+        if kitt.logging and current_time - old_time > logging_interval:
+            kitt.read_sensors()
+            old_time = current_time
+
     #route(kitt)
