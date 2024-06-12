@@ -27,6 +27,7 @@ class KITT:
     ):
         # open an audio stream with the selected device
         self.Fs = 44100
+        pyaudio_handle = pyaudio.PyAudio()
         self.stream = pyaudio_handle.open(input_device_index=device_index,
                                      channels=5,
                                      format=pyaudio.paInt16,
@@ -90,18 +91,20 @@ class KITT:
         self.set_speed(150)
         self.set_angle(150)
 
-    # not working yet!
+    # ONLY WORKS WHEN DRIVING FORWARD!!!
     # emergence brake to quickly stop the vehicle
     def ebrake(self):
         self.set_angle(150)
+        brake_timer = 0.5
+        brake_force = 140
+        current_time = time.time()
 
-        #if self.status != "stopped":
-        if self.status == "forward":
-            print("going back")
-            self.set_speed(135)
-        elif self.status == "backward":
-            print("going forward")
-            self.set_speed(165)
+        while (brake_timer > 0):
+            self.set_speed(brake_force)
+            old_time = current_time
+            current_time = time.time()
+            dt = current_time - old_time
+            brake_timer -= dt
 
         self.set_speed(150)
 
@@ -121,7 +124,7 @@ class KITT:
         # read distance sensor
         self.send_command(f'Sd\n')
         status = self.serial.read_until(b'\x04')
-        print(status)
+        #print(status)
 
         temp = status.decode()
         temp = re.findall(r'\d+', temp)
@@ -258,6 +261,8 @@ def wasd(kitt):
 # predefined route for testing the movement model
 def route(kitt):
     input("Press enter to start route")
+    speed = 158
+    angle = 100
     start_time = time.time()
     current_time = time.time()
     while current_time - start_time < 5:
@@ -265,10 +270,10 @@ def route(kitt):
             kitt.set_speed(150)
             kitt.set_angle(150)
         elif current_time - start_time > 1:
-            kitt.set_speed(165)
-            kitt.set_angle(100)
+            kitt.set_speed(speed)
+            kitt.set_angle(angle)
         else:
-            kitt.set_speed(165)
+            kitt.set_speed(speed)
             kitt.set_angle(150)
         current_time = time.time()
 
