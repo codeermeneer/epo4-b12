@@ -1,7 +1,5 @@
-import csv
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy import integrate
+from scipy.optimize import fsolve
 
 class KITTmodel:
     # class constructor
@@ -33,24 +31,38 @@ class KITTmodel:
     # speed        the speed to give to KITT
     def set_speed(self, speed):
         forces = {  150: 0,
-                    155: 1.8,
-                    156: 2.4,
-                    159: 4.8,
-                    162: 7.5,
-                    165: 12.4  }
+                    #155: 1.8,
+                    156: 2.297,
+                    158: 4.777630521099073,
+                    159: 4.200,
+                    162: 8.975,
+                    165: 10.836  }
         self.Fa = forces[speed]
 
     # sets the KITT wheels to the given angle
     # angle        the angle to give to KITT
     def set_angle(self, angle):
-        angles = {  100: -23.96,
-                    115: -17.32,
-                    130: -9.89,
-                    150: 0,
-                    170: 8.86,
-                    185: 18.33,
-                    200: 26.53  }
-        self.phi = angles[angle]
+#        angles = {  100: -23.96,
+#                    115: -17.32,
+#                    130: -9.89,
+#                    150: 0,
+#                    170: 8.86,
+#                    185: 18.33,
+#                    200: 26.53  }
+#        self.phi = angles[angle]
+        self.phi = 0.50269697 * angle + -75.04025974025977
+
+    # stops the motors and straightens the wheels
+    def stop(self):
+        self.set_speed(150)
+        self.set_angle(150)
+
+    # emergence brake to quickly stop the vehicle
+    # in the model it is assumed that the ebrake stops the vehicle instantly
+    def ebrake(self):
+        self.set_speed(150)
+        self.set_angle(150)
+        self.v = 0
 
     # simulate the model for dt seconds
     # dt        time step
@@ -75,6 +87,9 @@ class KITTmodel:
             self.x = self.x + ((self.v*dt) * d)
 
         Fd = self.b * abs(self.v) + self.c * self.v**2
+        # make Fd act against v
+        if (self.v < 0):
+            Fd = -Fd
         Ftot = self.Fa - (Fd + self.Fb)
         a = Ftot / self.mass
 
@@ -88,12 +103,16 @@ class KITTmodel:
     def get_alpha(self):
         return self.alpha
 
+    def get_d(self):
+        return np.array([np.cos(self.alpha),np.sin(self.alpha)])
+
     def get_v(self):
         return self.v
 
     def get_z(self):
         return self.z
 
-    # solved simplified differential equation for v0 = 0
-    def vel(self, Fa, Fb, t, v0):
-        return (Fa-Fb)/self.b + ((Fb-Fa)/self.b)*np.exp((-self.b*t)/self.mass)
+    # solved simplified differential equation for v0
+    def vel(self, t, Fa, v0):
+        C = v0 - (Fa/self.b)
+        return Fa/self.b + C*np.exp((-self.b*t)/self.mass)
