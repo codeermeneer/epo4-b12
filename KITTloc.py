@@ -293,7 +293,7 @@ class Localization:
 
             self.prepare_signal(i)
 
-            print(f'index: %d' %self.index)
+            #print(f'index: %d' %self.index)
 
             self.intervals = self.get_intervals()
             self.time_diffs = self.get_TDOAS()
@@ -318,9 +318,9 @@ class Localization:
         average_y = np.average(estimation_list_y)
         self.estimate_error(average_x, average_y)
 
-        print(f'\naverage (x,y): (%.2f, %.2f)' % (average_x, average_y))
+        #print(f'\naverage (x,y): (%.2f, %.2f)' % (average_x, average_y))
         self.index = -1
-        self.visualpos(average_x, average_y)
+        #self.visualpos(average_x, average_y)
 
         return average_x, average_y
 
