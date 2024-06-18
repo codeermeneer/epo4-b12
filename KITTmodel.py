@@ -113,6 +113,15 @@ class KITTmodel:
     def get_d(self):
         return np.array([np.cos(self.alpha),np.sin(self.alpha)])
 
+    def set_d(self, x, y):
+        alpha_new = np.arctan(y/x)
+        if (x < 0 and y < 0):
+            alpha_new -= np.pi
+        elif x < 0:
+            alpha_new += np.pi
+
+        self.alpha = alpha_new
+
     def get_v(self):
         return self.v
 

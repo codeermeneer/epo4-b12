@@ -192,7 +192,7 @@ class KITT:
 
     def localize(self, real_x, real_y, duration):
         y = self.record(int(44100 * duration))      # record for duration seconds(x * Fs samples)
-        est_x, est_y = self.loc.locate(y, real_x, real_y)
+        est_x, est_y = self.loc.locate(y, real_x*100, real_y*100)
         self.last_loc_x = est_x
         self.last_loc_y = est_y
         return est_x, est_y
