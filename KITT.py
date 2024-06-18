@@ -8,6 +8,8 @@ import pyaudio
 from scipy.io import wavfile
 import datetime
 from threading import Thread
+import KITTloc
+from wavaudioread import wavaudioread
 
 class KITT:
     # class constructor
@@ -20,10 +22,10 @@ class KITT:
     #   code
     def __init__(
         self, device_index, port, baudrate=115200,
-        carrier_frequency=10000,
-        bit_frequency=5000,
-        repitition_count=2500,
-        code=0xDEADBEEF
+        carrier_frequency=5000, #10000
+        bit_frequency=1000, #1500 best results for 10-jun-far-cut-ref.wav
+        repitition_count=200,
+        code=0x4B3E3750
     ):
         # open an audio stream with the selected device
         self.Fs = 44100
@@ -33,6 +35,10 @@ class KITT:
                                      format=pyaudio.paInt16,
                                      rate=self.Fs,
                                      input=True)
+        self.stream.stop_stream()
+
+        self.y_ref = np.array(wavaudioread("ref tests/5000-1000-87.wav", 44100))
+        self.loc = KITTloc.Localization(False, self.y_ref, 1, 20000)
 
         # open the serial connection to KITT
         self.serial = serial.Serial(port, baudrate, rtscts=True)
@@ -51,12 +57,14 @@ class KITT:
         self.serial.write(b'C' + code + b'\n')
 
         # initialize sensor data array
-        self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay', 'voltage', 'speed', 'angle']]
+        self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay', 'voltage', 'speed', 'angle', 'last_loc_x', 'last_loc_y']]
         self.start_time = time.time()
 
         # state variables such as speed, angle are defined here
         self.speed = 150
         self.angle = 150
+        self.last_loc_x = 0
+        self.last_loc_y = 0
 
         self.last_dir = "stopped"
 
@@ -94,9 +102,9 @@ class KITT:
     # ONLY WORKS WHEN DRIVING FORWARD!!!
     # emergence brake to quickly stop the vehicle
     def ebrake(self):
-        self.set_angle(150)
-        brake_timer = 0.5
-        brake_force = 140
+        #self.set_angle(150)
+        brake_timer = 0.3
+        brake_force = 142
         current_time = time.time()
 
         while (brake_timer > 0):
@@ -145,7 +153,7 @@ class KITT:
         end = time.time()
         duration = end - start
 
-        self.sensor_data.append([t_plus, dist_l, dist_r, duration, voltage, self.speed, self.angle])
+        self.sensor_data.append([t_plus, dist_l, dist_r, duration, voltage, self.speed, self.angle, self.last_loc_x, self.last_loc_y])
 
     def toggle_logs(self):
         self.logging = not self.logging
@@ -167,7 +175,9 @@ class KITT:
     # records N samples of audio
     def record(self, N):
         self.start_beacon()
+        self.stream.start_stream()
         samples = self.stream.read(N)       # read N samples
+        self.stream.stop_stream()
         self.stop_beacon()
 
         # deinterleave channels
@@ -176,7 +186,16 @@ class KITT:
         #data = np.transpose(data)
 
         # save to file
-        wavfile.write("recording.wav", self.Fs, data)
+        #wavfile.write("recording.wav", self.Fs, data)
+
+        return data
+
+    def localize(self, real_x, real_y, duration):
+        y = self.record(int(44100 * duration))      # record for duration seconds(x * Fs samples)
+        est_x, est_y = self.loc.locate(y, real_x, real_y)
+        self.last_loc_x = est_x
+        self.last_loc_y = est_y
+        return est_x, est_y
 
     # deconstructor, stops the car and beacon and then safely closes the serial connection
     def __del__(self):
@@ -249,8 +268,13 @@ def wasd(kitt):
             kitt.clear_data()
 
         if event.event_type == keyboard.KEY_DOWN and event.name == 'z':
-            print("recording...")
-            kitt.record(88200)      # record for 2 seconds(2 * Fs samples)
+            duration = 1 # in seconds
+
+            real_x = 436
+            real_y = 314
+
+            est_x, est_y = kitt.localize(real_x, real_y, duration)
+            print("Position: (", est_x, ", ", est_y, ")")
 
         # exit loop when escape is pressed
         if event.event_type == keyboard.KEY_DOWN and event.name == 'esc':
@@ -297,13 +321,18 @@ if __name__ == "__main__":
 
     kitt = KITT(device_index, comport)
 
-    wasd_thread = Thread(target=wasd, args=(kitt,))
-    wasd_thread.start()
-    while wasd_thread.is_alive():
-        # read the sensor data each logging interval
-        current_time = time.time()
-        if kitt.logging and current_time - old_time > logging_interval:
-            kitt.read_sensors()
-            old_time = current_time
+    #y_ref = np.array(wavaudioread("ref tests/5000-1000-87.wav", 44100))
+    #loc = KITTloc.Localization(True, y_ref, 1, 20000)
+
+#    wasd_thread = Thread(target=wasd, args=(kitt,))
+#    wasd_thread.start()
+#    while wasd_thread.is_alive():
+#        # read the sensor data each logging interval
+#        current_time = time.time()
+#        if kitt.logging and current_time - old_time > logging_interval:
+#            kitt.read_sensors()
+#            old_time = current_time
+    wasd(kitt)
+
 
     #route(kitt)
