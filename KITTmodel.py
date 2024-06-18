@@ -81,6 +81,8 @@ class KITTmodel:
             omega = (self.v * np.sin(self.phi))/self.length
             theta = omega * dt
             self.alpha = (self.alpha + theta) % (2*np.pi)
+            if self.alpha > np.pi:
+                self.alpha = -(2*np.pi-self.alpha)
 
             Rot = np.array([[np.cos(theta), -np.sin(theta)],
                             [np.sin(theta), np.cos(theta)]])

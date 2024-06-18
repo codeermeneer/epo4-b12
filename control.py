@@ -33,6 +33,8 @@ c = 0.1
 L = 0.335
 x0 = 0.2
 y0 = 0.25
+x0 = 4.6
+y0 = 4.6
 alpha0 = 90
 v0 = 0
 
@@ -43,7 +45,7 @@ kitt_model = KITTmodel.KITTmodel(m, b, c, L, x0, y0, alpha0, v0)
 
 COM = "/dev/rfcomm0"
 
-enable_KITT = True
+enable_KITT = False
 if enable_KITT:
 # list audio devices
     pyaudio_handle = pyaudio.PyAudio()
@@ -66,6 +68,7 @@ theta_list = []
 v_list = []
 z_list = []
 dist_list = []
+phi_goal_list = []
 t_list = []
 loc_x_list = [x0]
 loc_y_list = [y0]
@@ -73,8 +76,11 @@ loc_y_list = [y0]
 
 #xA = 4.0
 #yA = 2.3
-xA = 2.30
-yA = 2.30
+xA = 2.3
+yA = 2.3
+
+xB = 2
+yB = 4
 
 #x_loc = [0.294, 0.36, 0.371]
 #y_loc = [0.486, 0.816, 1.139]
@@ -83,9 +89,6 @@ yA = 2.30
 is_chB = True
 b_finished = False
 
-xB = 4.00
-yB = 2.30
-
 x_goal = xA
 y_goal = yA
 goal = np.array((x_goal, y_goal))
@@ -93,7 +96,7 @@ input("Press enter to start...")
 
 loc_interval = 2
 logging_interval = 0.1
-loc_on = True
+loc_on = False
 
 start_time = time.time()
 current_time = start_time
@@ -101,7 +104,9 @@ old_time = current_time
 last_loc_time = start_time
 finished = False
 
-max_time = 60
+max_time = 5
+if is_chB:
+    max_time = 2*max_time + 10
 
 stopped = True
 while not finished:
@@ -171,8 +176,11 @@ while not finished:
             old_time = time.time()
 
     d_goal = goal - kitt_model.get_x()
+    #print("d_goal", d_goal)
     distance = np.linalg.norm(d_goal)
+    #print("distance", distance)
     d_goal = d_goal/distance
+    #print("goal", goal)
 
     if distance < 0.17:
         if enable_KITT:
@@ -182,11 +190,17 @@ while not finished:
         if (is_chB and (not b_finished)):
             b_finished = True
             print("Waiting 10 seconds...")
-            time.sleep(10)
+            if enable_KITT:
+                time.sleep(10)
             old_time = time.time()
             x_goal = xB
             y_goal = yB
             goal = np.array((x_goal, y_goal))
+
+            d_goal = goal - kitt_model.get_x()
+            distance = np.linalg.norm(d_goal)
+            d_goal = d_goal/distance
+
             print("Continuing with challenge B...")
             #input("Press enter to continue")
         else :
@@ -195,23 +209,24 @@ while not finished:
     else:
         speed = 158
 
-    d_goal = goal - kitt_model.get_x()
-    #print("d_goal", d_goal)
-    distance = np.linalg.norm(d_goal)
-    #print("distance", distance)
-    d_goal = d_goal/distance
-    #print("goal", goal)
 
-    phi_car = kitt_model.get_alpha()
+#    phi_car = kitt_model.get_alpha()
+#
+#    phi_goal = np.arctan(d_goal[1]/d_goal[0])
+#    if (d_goal[0] < 0 and d_goal[1] < 0):
+#        phi_goal -= np.pi
+#    elif d_goal[0] < 0:
+#        phi_goal += np.pi
 
-    phi_goal = np.arctan(d_goal[1]/d_goal[0])
-    if (d_goal[0] < 0 and d_goal[1] < 0):
-        phi_goal -= np.pi
-    elif d_goal[0] < 0:
-        phi_goal += np.pi
+    #if phi_goal < 0:
+    #    phi_goal = 360 - phi_goal
 
+    d_car = kitt_model.get_d()
+    theta = np.arccos(np.dot(d_car, d_goal))
+    d_goal_ccw90 = np.array((-d_goal[1],d_goal[0]))
+    if np.dot(d_car, d_goal_ccw90) < 0:
+        theta = -theta
 
-    theta = phi_car - phi_goal
     #theta = phi_car - phi_goal
     #print("theta: ", np.rad2deg(theta))
     theta_list.append(np.rad2deg(theta))
@@ -235,8 +250,10 @@ while not finished:
     z_list.append(kitt_model.z)
     t_list.append(current_time)
     dist_list.append(distance)
+    #phi_goal_list.append(np.rad2deg(phi_goal))
 
     current_time = time.time()
+    #print("t: ", current_time - start_time)
     dt = current_time - old_time
     kitt_model.sim(dt)
 
@@ -266,21 +283,23 @@ a[0][0].set_ylabel("Y Position [m]")
 a[0][0].set_title("Position on the field")
 a[0][0].set_xlim(0,4.8)
 a[0][0].set_ylim(0,4.8)
-a[0][0].set_aspect('equal')
+#a[0][0].set_aspect('equal')
 
-a[1][0].plot(t_list, np.degrees(alpha_list))
+a[1][0].scatter(t_list, np.degrees(alpha_list), s=1)
 a[1][0].set_xlabel("Time [s]")
 a[1][0].set_ylabel("Orientation [degrees]")
 a[1][0].set_title("Orientation of the car")
 
-a[0][1].plot(t_list, dist_list)
+#a[0][1].plot(t_list, dist_list)
 #a[0][1].plot(t_list, theta_list)
+#a[0][1].plot(t_list, phi_goal_list)
 a[0][1].set_xlabel("Time [s]")
-a[1][0].set_ylabel("Angle [degrees]")
+#a[1][0].set_ylabel("Angle [degrees]")
 a[0][1].set_ylabel("Distance [m]")
 a[0][1].set_title("Distance to the goal")
 
-a[1][1].plot(t_list, v_list)
+#a[1][1].plot(t_list, v_list)
+a[1][1].plot(t_list, theta_list)
 a[1][1].set_xlabel("Time [s]")
 a[1][1].set_ylabel("Velocity [m/s]")
 a[1][1].set_title("Velocity over time")
