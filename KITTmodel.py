@@ -33,7 +33,7 @@ class KITTmodel:
         forces = {  150: 0,
                     #155: 1.8,
                     156: 2.297,
-                    158: 4.777630521099073,
+                    158: 4.777630521099073*1,
                     159: 4.200,
                     162: 8.975,
                     165: 10.836  }
@@ -50,7 +50,10 @@ class KITTmodel:
 #                    185: 18.33,
 #                    200: 26.53  }
 #        self.phi = angles[angle]
-        self.phi = 0.50269697 * angle + -75.04025974025977
+        #self.phi = 0.50269697 * angle + -75.04025974025977
+        coef = 0.50269697 * 1
+        intercept = -150 * coef
+        self.phi = coef * angle + intercept
 
     # stops the motors and straightens the wheels
     def stop(self):
@@ -61,7 +64,7 @@ class KITTmodel:
     # in the model it is assumed that the ebrake stops the vehicle instantly
     def ebrake(self):
         self.set_speed(150)
-        self.set_angle(150)
+        #self.set_angle(150)
         self.v = 0
 
     # simulate the model for dt seconds
@@ -99,6 +102,10 @@ class KITTmodel:
 
     def get_x(self):
         return self.x
+
+    def set_x(self, x, y):
+        self.x[0] = x
+        self.x[1] = y
 
     def get_alpha(self):
         return self.alpha
