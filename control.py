@@ -1,12 +1,10 @@
 import time
+import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import pyaudio
-import KITTloc
-from wavaudioread import wavaudioread
 import KITTmodel
 import KITT
-import datetime
 
 def theta_to_angle_1(theta_in):
     max_theta = 30
@@ -27,15 +25,16 @@ def theta_to_angle_2(theta_in):
 
     return 150
 
-m = 5.6
-b = 5.25
-c = 0.1
+# model input parameters
+m = 5.6         # mass of the car
+b = 5.25        # drag coefficient
+c = 0.1         # air drag coefficient
 
-L = 0.335
-x0 = 0.2
-y0 = 0.25
-alpha0 = 90
-v0 = 0
+L = 0.335       # lenght between axles
+x0 = 0.2        # initial x position
+y0 = 0.25       # initial y position
+alpha0 = 90     # initial orientation
+v0 = 0          # initial velocity
 
 kitt_model = KITTmodel.KITTmodel(m, b, c, L, x0, y0, alpha0, v0)
 
@@ -45,7 +44,7 @@ enable_KITT = input("Enter y if you want to enable KITT: ") == 'y'
 loc_on = input("Enter y if you want to enable localization: ") == 'y'
 
 if enable_KITT:
-# list audio devices
+    # list audio devices
     pyaudio_handle = pyaudio.PyAudio()
     for i in range(pyaudio_handle.get_device_count()):
         device_info = pyaudio_handle.get_device_info_by_index(i)
@@ -68,10 +67,11 @@ z_list = []
 dist_list = []
 phi_goal_list = []
 t_list = []
+# use x0,y0 as first localization point
 loc_x_list = [x0]
 loc_y_list = [y0]
 
-
+# enter coordinates as a list
 goal_list = []
 goals = input("Enter your coordinates like this: x,y;x,y;xy;... : ")
 goals = goals.split(";")
@@ -79,11 +79,14 @@ for goal in goals:
     goal = goal.split(",")
     goal_list.append(np.array((float(goal[0]),float(goal[1]))))
 
+# first goal
 goal_index = 0
-
 goal = goal_list[goal_index]
 input("Press enter to start...")
+# if only one goal is given this will be true and we have Challenge A
+last_goal = goal_index == len(goal_list)-1
 
+# timers and timing
 loc_interval = 2
 logging_interval = 0.1
 
@@ -91,12 +94,12 @@ start_time = time.time()
 current_time = start_time
 old_time = current_time
 last_loc_time = start_time
-finished = False
 
 max_time = 300
 
-last_goal = goal_index == len(goal_list)-1
+finished = False
 while not finished:
+    # KITT logs
     if enable_KITT:
         if kitt.logging and current_time - old_time > logging_interval:
             kitt.read_sensors()
@@ -115,7 +118,8 @@ while not finished:
             if enable_KITT:
                 kitt.ebrake()
             kitt_model.ebrake()
-            old_time = time.time()
+            old_time = time.time() # update time to prevent large time skips
+
             print("Localizing...")
             duration = 0.6 # in seconds
 
@@ -137,6 +141,8 @@ while not finished:
                 diffy = est_y/100 - kitt_model.x[1]
                 dist = np.sqrt(diffx**2 + diffy**2)
 
+                # KITTloc returns nan with invalid coordinates
+                # this checks for nan values
                 invalid = bool(est_x != est_x or est_y != est_y)
 
             if invalid_count < 5:
@@ -154,21 +160,22 @@ while not finished:
             else :
                 print("No valid location found, continuing with model...")
             #input("Localizing done, press enter to continue...")
-            old_time = time.time()
+            old_time = time.time() # update time
 
+    # vector from car to goal
     d_goal = goal - kitt_model.get_x()
     #print("d_goal", d_goal)
     distance = np.linalg.norm(d_goal)
     #print("distance", distance)
-    d_goal = d_goal/distance
+    d_goal = d_goal/distance        # normalize
     #print("goal", goal)
 
-    if distance < 0.17:
+    if distance < 0.17: # goal is reached
         if enable_KITT:
             kitt.ebrake()
         kitt_model.ebrake()
-        if (not last_goal):
-            b_finished = True
+
+        if not last_goal:
             print("Waiting 10 seconds...")
             if enable_KITT:
                 time.sleep(10)
@@ -187,7 +194,7 @@ while not finished:
         else :
             finished = True
             break
-    else:
+    else:   # if goal is not reached continue with driving
         speed = 158
 
 
@@ -202,16 +209,17 @@ while not finished:
     #if phi_goal < 0:
     #    phi_goal = 360 - phi_goal
 
+    # get angle between car dir vector and car to goal vector
     d_car = kitt_model.get_d()
     theta = np.arccos(np.dot(d_car, d_goal))
     d_goal_ccw90 = np.array((-d_goal[1],d_goal[0]))
-    if np.dot(d_car, d_goal_ccw90) < 0:
-        theta = -theta
+    if np.dot(d_car, d_goal_ccw90) < 0: # checks if the goal is left or right from car
+        theta = -theta  # if product < 0 the goal is to the left and we need a negative angle
 
     #theta = phi_car - phi_goal
     #print("theta: ", np.rad2deg(theta))
     theta_list.append(np.rad2deg(theta))
-    angle = theta_to_angle_1(np.rad2deg(theta))
+    angle = theta_to_angle_1(np.rad2deg(theta)) # convert angles to PWM commands
     #print(angle)
 
     if enable_KITT:
@@ -256,11 +264,12 @@ a[0][0].scatter(goal_list[0],goal_list[1], color='green')
 a[0][0].set_xlabel("X position [m]")
 a[0][0].set_ylabel("Y Position [m]")
 a[0][0].set_title("Position on the field")
-a[0][0].set_xlim(0,4.8)
-a[0][0].set_ylim(0,4.8)
-#a[0][0].set_aspect('equal')
+a[0][0].set_xlim(0,4.6)
+a[0][0].set_ylim(0,4.6)
+a[0][0].set_aspect('equal')
 
-a[1][0].scatter(t_list, np.degrees(alpha_list), s=1)
+a[1][0].plot(t_list, theta_list)
+#a[1][0].plot(t_list, np.degrees(alpha_list))
 a[1][0].set_xlabel("Time [s]")
 a[1][0].set_ylabel("Orientation [degrees]")
 a[1][0].set_title("Orientation of the car")
