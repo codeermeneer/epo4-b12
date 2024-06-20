@@ -59,6 +59,8 @@ class KITT:
         # initialize sensor data array
         self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay', 'voltage', 'speed', 'angle', 'last_loc_x', 'last_loc_y']]
         self.start_time = time.time()
+        self.distances_l = []
+        self.distances_r = []
 
         # state variables such as speed, angle are defined here
         self.speed = 150
@@ -154,6 +156,8 @@ class KITT:
         duration = end - start
 
         self.sensor_data.append([t_plus, dist_l, dist_r, duration, voltage, self.speed, self.angle, self.last_loc_x, self.last_loc_y])
+        self.distances_l.append(dist_l)
+        self.distances_r.append(dist_r)
 
     def toggle_logs(self):
         self.logging = not self.logging
@@ -171,6 +175,8 @@ class KITT:
         print("clearing data...")
         self.sensor_data = [['time', 'dist_l', 'dist_r', 'sensor_delay', 'voltage', 'speed', 'angle']]
         self.start_time = time.time()
+        self.distances_l = []
+        self.distances_r = []
 
     # records N samples of audio
     def record(self, N):

@@ -42,6 +42,7 @@ COM = "/dev/rfcomm0"
 
 enable_KITT = input("Enter y if you want to enable KITT: ") == 'y'
 loc_on = input("Enter y if you want to enable localization: ") == 'y'
+chalCD = input("Enter y if you want to enable challenge C/D") == 'y'
 
 if enable_KITT:
     # list audio devices
@@ -101,7 +102,7 @@ finished = False
 while not finished:
     # KITT logs
     if enable_KITT:
-        if kitt.logging and current_time - old_time > logging_interval:
+        if (current_time - old_time) > logging_interval:
             kitt.read_sensors()
 
     old_time = current_time
@@ -161,6 +162,7 @@ while not finished:
                 print("No valid location found, continuing with model...")
             #input("Localizing done, press enter to continue...")
             old_time = time.time() # update time
+
 
     # vector from car to goal
     d_goal = goal - kitt_model.get_x()
@@ -222,6 +224,23 @@ while not finished:
     angle = theta_to_angle_1(np.rad2deg(theta)) # convert angles to PWM commands
     #print(angle)
 
+    # Challenge C/D code (does not work yet)
+    if chalCD:
+        obstacle_l = 0
+        obstacle_r = 0
+        if len(kitt.distances_l) > 5:
+            for dist_l in kitt.distances_l[len(kitt.distances_l)-5:len(kitt.distances_l)-1]:
+                if dist_l < 80:
+                    obstacle_l += 1
+            for dist_r in kitt.distances_r[len(kitt.distances_r)-5:len(kitt.distances_r)-1]:
+                if dist_r < 80:
+                    obstacle_r += 1
+
+        if obstacle_l > 3:
+            angle = 100
+        elif obstacle_r > 3:
+            angle = 200
+
     if enable_KITT:
         kitt.set_angle(int(angle))
         kitt.set_speed(speed)
@@ -271,8 +290,8 @@ a[0][0].set_aspect('equal')
 a[1][0].plot(t_list, theta_list)
 #a[1][0].plot(t_list, np.degrees(alpha_list))
 a[1][0].set_xlabel("Time [s]")
-a[1][0].set_ylabel("Orientation [degrees]")
-a[1][0].set_title("Orientation of the car")
+a[1][0].set_ylabel("Theta [degrees]")
+a[1][0].set_title("Angle to the goal")
 
 a[0][1].plot(t_list, dist_list)
 #a[0][1].plot(t_list, theta_list)
