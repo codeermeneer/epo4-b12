@@ -10,6 +10,7 @@ from wavaudioread import wavaudioread
 
 from scipy.optimize import least_squares
 # from recording_tool import recording_tool
+import time
 
 # The class localization contains all relevant functions, including signal preparation, signal processing,
 # location estimation signal processing, location estimationerror estimation, and plotting.
@@ -38,6 +39,7 @@ class Localization:
         self.real_x = 0
         self.real_y = 0
         self.index = 0
+        self.peak_sample = 0
 
         self.y_ref = y_ref
         self.repeat_count = repeat_count
@@ -156,6 +158,7 @@ class Localization:
         h = self.ch3(y_ref, y, self.epsi)
 
         peak_sample = self.findpeak(h, 0, 1, 30)
+        self.peak_sample = peak_sample
 
         # print(peak_sample)
         # take the first peak's index and calculate microphone distance
@@ -306,8 +309,7 @@ class Localization:
             if ((estimated_y <= 480) and (estimated_y > 0)):
                 estimation_list_y += [estimated_y]
 
-            if self.debug:
-
+            #if self.debug:
                 self.showcut()
                 self.showsigs()
                 self.showplots()
@@ -316,11 +318,11 @@ class Localization:
 
         average_x = np.average(estimation_list_x)
         average_y = np.average(estimation_list_y)
-        self.estimate_error(average_x, average_y)
+        #self.estimate_error(average_x, average_y)
 
         #print(f'\naverage (x,y): (%.2f, %.2f)' % (average_x, average_y))
         self.index = -1
-        #self.visualpos(average_x, average_y)
+        self.visualpos(average_x, average_y)
 
         return average_x, average_y
 
@@ -410,6 +412,8 @@ class Localization:
         text = ['First', 'Second', 'Third', 'Fourth', 'Fifth']  # text for use in plots
 
         fig, ax = plt.subplots(5, 2, figsize=(10, 10))
+        hhat_m = self.ch3(self.y_ref[:, 0], self.y[:, 0], self.epsi)
+        center = self.peak_sample
         for i in range(5):
             hhat_m = self.ch3(self.y_ref[:, 0], self.y[:, i], self.epsi)
             tm = np.arange(0, len(self.y[:, i]), 1)
@@ -425,7 +429,7 @@ class Localization:
             ax[i, 1].set_title(f'%s microphone channel estimation' % text[i])
             ax[i, 1].set_xlabel("Time [s]")
             ax[i, 1].set_ylabel("Magnitude")
-            ax[i, 1].set_xlim(0, len(hhat_m))
+            ax[i, 1].set_xlim(center - 300, center + 700)
 
         fig.tight_layout()
         plt.show()
@@ -585,6 +589,45 @@ def jun10_test():
 
         calculated_x, calculated_y = loc.locate(y, real_x, real_y)
 
+def speed_test():
+
+    time_per_execution_list = []
+
+    runs = 100
+
+    y_ref = np.array(wavaudioread("test_recordings/ref_short_testrecordings.wav", 44100))
+    loc = Localization(False, y_ref, 1, 200000)
+
+    record_x = [64, 82, 109, 143, 150, 178, 232]
+    record_y = [40, 399, 76, 296, 185, 439, 275]
+
+    for i in range(len(record_x)):
+        real_x = record_x[i]
+        real_y = record_y[i]
+
+        filename = "test_recordings/record_x" + str(real_x) + "_y" + str(
+            real_y) + ".wav"  # this automatically picks the right file name for known locations
+
+        y = np.array(wavaudioread(filename, 44100))
+
+        calculated_x, calculated_y = loc.locate(y, real_x - 10, real_y - 10)
+
+
+        starttime = time.time()
+        for i in range(runs):
+            #print(i)
+            calculated_x, calculated_y = loc.locate(y, real_x, real_y)
+        stoptime = time.time()
+
+        time_taken = stoptime - starttime
+        time_per_execution = time_taken / runs
+
+        print(f'time taken for (x,y) = %d, %d: total time taken = %f s' % (real_x, real_y, time_taken))
+        print(f'time per location estimate = %f s\n' % (time_per_execution))
+        time_per_execution_list += [time_per_execution]
+
+    avg_time = np.sum(time_per_execution_list) / len(time_per_execution_list)
+    print('average execution time of a single localization: %f' % (avg_time))
 
 if __name__ == "__main__":
 
